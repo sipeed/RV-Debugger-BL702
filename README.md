@@ -11,20 +11,24 @@ The firmware emulate an [FT2232D](https://ftdichip.com/products/ft2232d/) device
 Community Forum:  bbs.sipeed.com
 
 # Hardware
-Offical Board: Sipeed RV-Debugger-Plus  (BL702C-A0)
+## Offical Board
+
+Sipeed RV-Debugger-Plus  (BL702C-A0)
 
 Purchase link: taobao.com/xxx
 
-Schematic: xxxx
+Schematic: [BL702_USB2JTAG_3610_sch.pdf](hardware/BL702_USB2JTAG_3610_sch.pdf)
 
-Assembly: xxxx
-
-Picture:xxxx
+Assembly: [BL702_USB2JTAG_3610_asm.pdf](hardware/BL702_USB2JTAG_3610_asm.pdf)
 
 (LED0 is the led close to edge, indicate for RX)
 
+<img height=480 src="res/rv-debugger.png">
+<br />
 
-Third-party hardware: TODO
+## Third-party Hardware
+
+TODO
 
 # Firmware
 ## Flash Tutorial
@@ -77,14 +81,20 @@ Another GUI flash tool is BouffaloLabDevCube:
 Support JTAG+UART function
 
 UART support baudrate below 2Mbps, and 3Mbps, and some experimental baudrate (stability is not guaranteed):
+
 ~~~
 12M, 9.6M, 8M, 6.4M, 6M, 4.8M, 4M, 3.2M
 we remap baudrate in 10000~12000 to (baud-10000)*10000
 for example, 11200bps -> 12Mbps
 ~~~
+
 LED0 for RX indication, LED1 for TX indication.
 
-JTAG function is verified for RV32 Xuantie E906/E907, RV64 Xuantie C906.
+JTAG function is verified for :
+
+- RV32 Xuantie E906/E907
+- RV64 Xuantie C906
+- Gowin FPGA GW1N-1, GW1NS-4C.
 
 ## usb2dualuart
 TODO.
@@ -139,4 +149,6 @@ examples/usb/usb2uartjtag:
 components/usb_stack/class/vendor:
 └── usbd_ftdi.c      //all FTDI vendor request process, like baudrate set, dtr/rts set, Latency_Timer
 ~~~
+
+TODO
 

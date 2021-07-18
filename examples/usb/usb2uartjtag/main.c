@@ -100,6 +100,10 @@ void usbd_ftdi_set_rts(bool rts)
 
 /************************  USB UART logic for latency timer  ************************/
 static volatile uint32_t temp_tick2 = 0;	//tick for uart port
+static volatile uint32_t temp_tick1 = 0;	//tick for uart port
+uint64_t last_send = 0;
+
+extern  uint32_t mpsse_status;
 // UART RX -> USB IN
 uint16_t usb_dc_ftdi_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep)
 {
@@ -128,16 +132,27 @@ uint16_t usb_dc_ftdi_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *
     if ((USB_Get_EPx_TX_FIFO_CNT(ep_idx) == USB_FS_MAX_PACKET_SIZE) && Ring_Buffer_Get_Length(rb))
     {
         uint8_t ftdi_header[2] = {0x01,0x60};
-
+		MSG("*");
         memcopy_to_fifo((void *)addr,ftdi_header,2);
         Ring_Buffer_Read_Callback(rb, USB_FS_MAX_PACKET_SIZE-2, memcopy_to_fifo, (void *)addr);
         USB_Set_EPx_Rdy(ep_idx);
 		led_toggle(0);	//RX indication
+		last_send = mtimer_get_time_us();
         return 0;
     }
     else
     {
-        if(ep_idx == 0x83)
+		/*uint64_t Latency_Timer = (ep_idx - 1)==0?usbd_ftdi_get_latency_timer1():usbd_ftdi_get_latency_timer2();	//超时才发
+		if(mtimer_get_time_us()-last_send>Latency_Timer*1000) {
+			uint8_t ftdi_header[2] = {0x01,0x60};       
+			memcopy_to_fifo((void *)addr,ftdi_header,2);
+			USB_Set_EPx_Rdy(ep_idx);
+			last_send = mtimer_get_time_us();
+			//MSG("Port%d refresh\r\n", ep_idx);
+			return -USB_DC_RB_SIZE_SMALL_ERR;
+		}*/
+		
+        if(ep_idx == CDC_IN_EP) //UART
         {
             if((uint32_t)(usbd_ftdi_get_sof_tick()-temp_tick2) >= usbd_ftdi_get_latency_timer2())
             {
@@ -147,14 +162,20 @@ uint16_t usb_dc_ftdi_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *
                 USB_Set_EPx_Rdy(ep_idx);
             }
         }
-        else
+        else	//0x81, JTAG
         {
-                uint8_t ftdi_header[2] = {0x01,0x60};     
-                                
-                memcopy_to_fifo((void *)addr,ftdi_header,2);
-                USB_Set_EPx_Rdy(ep_idx);
+            //if((uint32_t)(usbd_ftdi_get_sof_tick()-temp_tick1) >= usbd_ftdi_get_latency_timer1())
+			//if(mpsse_status != 12)
+			//MSG("#");
+			if(mtimer_get_time_us()-last_send>1000)
+            {
+				uint8_t ftdi_header[2] = {0x01,0x60};     
+				temp_tick1 = usbd_ftdi_get_sof_tick();  				
+				memcopy_to_fifo((void *)addr,ftdi_header,2);
+				USB_Set_EPx_Rdy(ep_idx);
+			}
         }
-        return -USB_DC_RB_SIZE_SMALL_ERR;
+        return -USB_DC_RB_SIZE_SMALL_ERR; 
     }
 
 }
@@ -241,13 +262,13 @@ usbd_endpoint_t cdc_in_ep1 =
 //For JTAG
 usbd_endpoint_t cdc_out_ep0 = 
 {
-    .ep_addr = 0x02,
+    .ep_addr = JTAG_OUT_EP,
     .ep_cb = usbd_cdc_jtag_out
 };
 
 usbd_endpoint_t cdc_in_ep0 = 
 {
-    .ep_addr = 0x81,
+    .ep_addr = JTAG_IN_EP,
     .ep_cb = usbd_cdc_jtag_in
 };
 
@@ -278,8 +299,8 @@ int main(void)
     uart1_dtr_init();
     uart1_rts_init();
     led_gpio_init();
-	led_set(0, 1);	//led0 for RX indication
-	led_set(1, 1);	//led1 for TX indication
+	led_set(0, 1);	//led0 for RX/TX indication
+	led_set(1, 1);	//led1 for Power indication
     jtag_ringbuffer_init();
     jtag_gpio_init();
     EF_Ctrl_Read_Chip_ID(chipid);
@@ -310,7 +331,6 @@ int main(void)
     while(!usb_device_is_configured()){};
     
 	led_toggle(0);
-	led_toggle(1);
     while (1)
     {
         uart_send_from_ringbuffer();

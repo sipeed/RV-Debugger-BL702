@@ -26,6 +26,9 @@
 #define CDC_IN_EP 	0x83
 #define CDC_OUT_EP 	0x04
 
+#define JTAG_IN_EP 0x81
+#define JTAG_OUT_EP 0x02
+
 void usbd_ftdi_add_interface(usbd_class_t *class, usbd_interface_t *intf);
 
 void usbd_ftdi_set_line_coding(uint32_t baudrate, uint8_t databits, uint8_t parity, uint8_t stopbits);

@@ -213,7 +213,7 @@ void uart_send_from_ringbuffer(void)
                 memcpy(&uart_lli_list.cfg, &uart_dma_ctrl_cfg, sizeof(dma_control_data_t));
                 device_control(dma_ch2,DMA_CHANNEL_UPDATE,(void*)((uint32_t)&uart_lli_list));
                 dma_channel_start(dma_ch2);
-				led_toggle(1);	//TX indication
+				led_toggle(0);	//TX indication
             }
         }
     }

@@ -97,6 +97,8 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 		*actual_baudrate = baudrate;
 
 }
+
+//static char datatmp[2]={0x32, 0x60};
 static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len)
 {
 	static uint32_t actual_baudrate = 1200;

@@ -94,7 +94,7 @@ JTAG function is verified for :
 
 - RV32 Xuantie E906/E907
 - RV64 Xuantie C906
-- Gowin FPGA GW1N-1, GW1NS-4C.
+- Gowin FPGA GW1N-1, GW1NS-4C. (need enable GOWIN_INT_FLASH_QUIRK)
 
 ## usb2dualuart
 TODO.
@@ -139,6 +139,10 @@ RV-Debugger-BL702
 BL SDK usage tutorial refer to http://bouffalolab.gitee.io/bl_mcu_sdk/
 
 ## Develop Guide
+### Build
+just "make"
+
+### Code Explanation
 the main file is:
 ~~~
 examples/usb/usb2uartjtag:

@@ -37,7 +37,7 @@ jobs:
       run: |
         PATH="$PATH:/opt/riscv64-unknown-elf/bin"
         make
-    - name: Archive keyboard firmware
+    - name: Archive firmware
       uses: actions/upload-artifact@v2
       with:
         name: sipeed_rv_debuger_plus_firmware

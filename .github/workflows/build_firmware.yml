@@ -42,4 +42,4 @@ jobs:
       with:
         name: sipeed_rv_debuger_plus_firmware
         path: |
-          out/examples/usb/usb2uartjtag/*
+          out/usb/usb2uartjtag/*

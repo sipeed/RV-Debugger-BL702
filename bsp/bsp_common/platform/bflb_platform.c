@@ -135,7 +135,7 @@ void bflb_platform_printf(char *fmt, ...)
     char print_buf[128];
     va_list ap;
 
-    if(!uart_dbg_disable){
+    if(!uart_dbg_disable && uart){
         va_start(ap, fmt);
         vsnprintf(print_buf, sizeof(print_buf) - 1, fmt, ap);
         va_end(ap);

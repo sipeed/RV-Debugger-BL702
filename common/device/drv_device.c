@@ -183,7 +183,7 @@ int device_control(struct device *dev, int cmd, void *args)
 {
     int retval = DEVICE_EOK;
 
-    if (dev->status >= DEVICE_REGISTERED)
+    if (dev && dev->status >= DEVICE_REGISTERED)
     {
         if (dev_control != NULL)
         {

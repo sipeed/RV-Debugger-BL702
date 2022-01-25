@@ -98,6 +98,11 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 
 }
 
+#ifdef APP_DUAL_UART
+void usbd_ftdi_set_baudrate(uint8_t setup_index, uint32_t baudrate);
+void usbd_ftdi_set_data_framing(uint8_t setup_index, uint8_t databits, uint8_t parity, uint8_t stopbits);
+#endif
+
 //static char datatmp[2]={0x32, 0x60};
 static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len)
 {
@@ -113,7 +118,12 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 			break;
 
 		case SIO_SET_MODEM_CTRL_REQUEST:
-			if(pSetup->wValue == SIO_SET_DTR_HIGH)
+			if (pSetup->wIndexL == 1)
+			{
+				// no modem control pins for UART0
+				break;
+			}
+			if (pSetup->wValue == SIO_SET_DTR_HIGH)
 			{
 				//USBD_LOG("DTR 1\r\n");
 				usbd_ftdi_set_dtr(true);
@@ -140,7 +150,10 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		case SIO_SET_BAUDRATE_REQUEST://wValue，2个字节波特率
 		{	
 			uint8_t baudrate_high = (pSetup->wIndex >> 8);
-			ftdi_set_baudrate(pSetup->wValue|(baudrate_high<<16),&actual_baudrate);	
+			ftdi_set_baudrate(pSetup->wValue|(baudrate_high<<16),&actual_baudrate);
+#ifdef APP_DUAL_UART
+			usbd_ftdi_set_baudrate(pSetup->wIndexL, actual_baudrate);
+#endif
 			break;	
 		}
 		case SIO_SET_DATA_REQUEST:
@@ -150,11 +163,15 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		 * D11-D12 		STOP_BIT_1=0, STOP_BIT_15=1, STOP_BIT_2=2 
 		 * D14  		BREAK_OFF=0, BREAK_ON=1
 		 **/
+#ifdef APP_DUAL_UART
+			usbd_ftdi_set_data_framing(pSetup->wIndexL,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
+#else
 		 	if(actual_baudrate != 1200)
 			{
 				//USBD_LOG("CDC_SET_LINE_CODING <%d %d %s %s>\r\n",actual_baudrate,(uint8_t)pSetup->wValue,parity_name[(uint8_t)(pSetup->wValue>>8)],stop_name[(uint8_t)(pSetup->wValue>>11)]);
 				usbd_ftdi_set_line_coding(actual_baudrate,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
 			}
+#endif
 			break;
 
 		case SIO_POLL_MODEM_STATUS_REQUEST:
@@ -188,7 +205,8 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		- B4       Break interrupt (BI)
 		- B5       Transmitter holding register (THRE)
 		- B6       Transmitter empty (TEMT)
-		- B7       Error in RCVR FIFO */		
+		- B7       Error in RCVR FIFO */
+			/* FIXME: UART0? */
 			*data = (uint8_t*)&ftdi_eeprom_info[2];
 			*len = 2;
 			break;		

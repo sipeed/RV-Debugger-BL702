@@ -23,8 +23,9 @@
 #ifndef __HAL_UART__H__
 #define __HAL_UART__H__
 
-#include "drv_device.h"
 #include "bl702_config.h"
+#include "ring_buffer.h"
+#include "drv_device.h"
 
 #define DEVICE_CTRL_UART_GET_TX_FIFO        0x10
 #define DEVICE_CTRL_UART_GET_RX_FIFO        0x11
@@ -59,7 +60,8 @@ typedef enum
     UART_DATA_LEN_5 = 0,  /*!< Data length is 5 bits */
     UART_DATA_LEN_6 = 1,  /*!< Data length is 6 bits */
     UART_DATA_LEN_7 = 2,  /*!< Data length is 7 bits */
-    UART_DATA_LEN_8 = 3   /*!< Data length is 8 bits */
+    UART_DATA_LEN_8 = 3,  /*!< Data length is 8 bits */
+    UART_DATA_LEN_IGNORE
 } uart_databits_t;
 
 /*!
@@ -71,7 +73,8 @@ typedef enum
 {
     UART_STOP_ONE = 0,  /*!< One stop bit */
     UART_STOP_ONE_D_FIVE = 0,  /*!< 1.5 stop bit */
-    UART_STOP_TWO = 1   /*!< Two stop bits */
+    UART_STOP_TWO = 1,  /*!< Two stop bits */
+    UART_STOP_IGNORE
 } uart_stopbits_t;
 
 /*!
@@ -84,6 +87,7 @@ typedef enum
     UART_PAR_NONE = 0,  /*!< No parity */
     UART_PAR_ODD  = 1,  /*!< Parity bit is odd */
     UART_PAR_EVEN = 2,  /*!< Parity bit is even */
+    UART_PAR_IGNORE
 } uart_parity_t;
 
 enum uart_event_type
@@ -128,10 +132,15 @@ typedef struct uart_device
     uint8_t fifo_threshold;
     void* tx_dma;
     void* rx_dma;
+#ifdef APP_DUAL_UART
+    Ring_Buffer_Type usb_rx_rb;
+    Ring_Buffer_Type uart_rx_rb;
+#endif
 } uart_device_t;
 
 #define UART_DEV(dev) ((uart_device_t*)dev)
 
 int uart_register(enum uart_index_type index, const char *name, uint16_t flag);
+uart_device_t *uart_get_device(enum uart_index_type index);
 
 #endif

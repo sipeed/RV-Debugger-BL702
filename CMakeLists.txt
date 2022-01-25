@@ -16,6 +16,11 @@ else()
 message(FATAL_ERROR "${CMAKE_SOURCE_DIR}/bsp/board/${BOARD} is not exist")
 endif()
 
+if(${APP} STREQUAL "usb2dualuart")
+add_definitions(-DAPP_DUAL_UART)
+else()
+endif()
+
 if(${SUPPORT_FLOAT} STREQUAL "y")
 add_definitions(-DBFLB_PRINT_FLOAT_SUPPORT)
 else()

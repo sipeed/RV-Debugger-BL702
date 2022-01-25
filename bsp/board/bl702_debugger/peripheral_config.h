@@ -84,6 +84,11 @@
 #endif
 
 #if defined(BSP_USING_UART0)
+#ifdef APP_DUAL_UART
+#define UART0_FIFO_THRESHOLD 64
+#else
+#define UART0_FIFO_THRESHOLD 1
+#endif
 #ifndef UART0_CONFIG
 #define UART0_CONFIG \
 {   \
@@ -92,7 +97,7 @@
  .databits = UART_DATA_LEN_8, \
  .stopbits = UART_STOP_ONE, \
  .parity = UART_PAR_NONE, \
- .fifo_threshold = 1, \
+ .fifo_threshold = UART0_FIFO_THRESHOLD, \
 }
 #endif
 #endif

@@ -44,6 +44,26 @@ static uart_device_t uartx_device[UART_MAX_INDEX] =
         UART1_CONFIG,
 #endif
 };
+
+/**
+ * @brief get uart_device_t by index, can be called even not registered
+ * 
+ * @param dev 
+ * @param oflag 
+ * @return int 
+ */
+uart_device_t *uart_get_device(enum uart_index_type index)
+{
+    int nr_uartx = sizeof(uartx_device) / sizeof(uart_device_t);
+
+    if (index >= 0 && index < nr_uartx)
+    {
+        struct device *dev = &uartx_device[index].parent;
+        return (uart_device_t*)dev;
+    }
+    return NULL;
+}
+
 /**
  * @brief 
  * 
@@ -198,6 +218,26 @@ int uart_control(struct device *dev, int cmd, void *args)
         /* Disable uart before config */
         UART_Disable(uart_device->id, UART_TXRX);
         uint32_t uart_clk = peripheral_clock_get(PERIPHERAL_CLOCK_UART);
+
+        if (cfg->baudrate >= 300)
+            uart_device->baudrate = cfg->baudrate;
+        else
+            cfg->baudrate = uart_device->baudrate;
+
+        if (IS_UART_DATABITS_TYPE((UART_DataBits_Type)cfg->databits))
+            uart_device->databits = cfg->databits;
+        else
+            cfg->databits = uart_device->databits;
+
+        if (IS_UART_STOPBITS_TYPE((UART_StopBits_Type)cfg->stopbits))
+            uart_device->stopbits = cfg->stopbits;
+        else
+            cfg->stopbits = uart_device->stopbits;
+
+        if (IS_UART_PARITY_TYPE((UART_Parity_Type)cfg->parity))
+            uart_device->parity = cfg->parity;
+        else
+            cfg->parity = uart_device->parity;
 
         uart_cfg.uartClk = uart_clk;
         uart_cfg.baudRate = cfg->baudrate;

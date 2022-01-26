@@ -303,6 +303,7 @@ static void hexarr2string(uint8_t *hexarray,int length,uint8_t *string)
 
 int main(void)
 {
+    uint8_t *serial;
     uint8_t chipid[8];
     uint8_t chipid2[6];
     GLB_Select_Internal_Flash();
@@ -320,12 +321,13 @@ int main(void)
     // hexarr2string(&chipid[2],3,chipid2);
     // bflb_platform_dump(chipid,8);
     // bflb_platform_dump(chipid2,6);
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24] = 	0x00; //chipid2[0];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+2] = 	0x11; //chipid2[1];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+4] = 	0x22; //chipid2[2];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+6] = 	0x33; //chipid2[3];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+8] = 	0x44; //chipid2[4];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+10] = 	0x55; //chipid2[5];
+    serial = &cdc_descriptor[0x12+0x37+0x04+ 0x0e + 0x1c+0x24];
+    serial[0] = 0x30; //chipid2[0];
+    serial[2] = 0x31; //chipid2[1];
+    serial[4] = 0x32; //chipid2[2];
+    serial[6] = 0x33; //chipid2[3];
+    serial[8] = 0x34; //chipid2[4];
+    serial[10] = 0x35; //chipid2[5];
     usbd_desc_register(cdc_descriptor);
 
     usbd_ftdi_add_interface(&cdc_class0,&cdc_data_intf0);

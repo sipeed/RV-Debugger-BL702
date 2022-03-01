@@ -35,11 +35,16 @@ jobs:
         tar -zxvf riscv64-elf-x86_64-20210120.tar.gz -C /opt/riscv64-unknown-elf
     - name: Make firmware
       run: |
-        PATH="$PATH:/opt/riscv64-unknown-elf/bin"
-        make
+        git submodule init
+        git submodule update
+        cd firmware/bl_mcu_sdk
+        PATH="/opt/riscv64-unknown-elf/bin:$PATH"
+        make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag
+        # make BOARD=bl702_debugger APP_DIR=../app APP=usb2dualuart
     - name: Archive firmware
       uses: actions/upload-artifact@v2
       with:
         name: sipeed_rv_debuger_plus_firmware
         path: |
-          out/usb/usb2uartjtag/*
+          firmware/bl_mcu_sdk/out/app/usb2uartjtag/*
+          # firmware/bl_mcu_sdk/out/app/usb2dualuart/*

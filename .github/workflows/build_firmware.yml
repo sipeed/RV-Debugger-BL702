@@ -40,11 +40,11 @@ jobs:
         cd firmware/bl_mcu_sdk
         PATH="/opt/riscv64-unknown-elf/bin:$PATH"
         make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag
-        # make BOARD=bl702_debugger APP_DIR=../app APP=usb2dualuart
+        make BOARD=bl702_debugger_dualuart APP_DIR=../app APP=usb2dualuart
     - name: Archive firmware
       uses: actions/upload-artifact@v2
       with:
         name: sipeed_rv_debuger_plus_firmware
         path: |
           firmware/bl_mcu_sdk/out/app/usb2uartjtag/*
-          # firmware/bl_mcu_sdk/out/app/usb2dualuart/*
+          firmware/bl_mcu_sdk/out/app/usb2dualuart/*

@@ -35,8 +35,7 @@ jobs:
         tar -zxvf riscv64-elf-x86_64-20210120.tar.gz -C /opt/riscv64-unknown-elf
     - name: Make firmware
       run: |
-        git submodule init
-        git submodule update
+        git submodule update --init
         cd firmware/bl_mcu_sdk
         PATH="/opt/riscv64-unknown-elf/bin:$PATH"
         make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag

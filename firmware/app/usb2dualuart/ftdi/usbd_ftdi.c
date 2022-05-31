@@ -158,6 +158,13 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,
     {
       ftdi_set_baudrate(pSetup->wValue | ((pSetup->wIndexH) << 16),
                         &actual_baudrate[_epid]);
+      if (actual_baudrate[_epid] != 1200) {
+        // USBD_LOG("CDC_SET_LINE_CODING <%d %d %s
+        // %s>\r\n",actual_baudrate,(uint8_t)pSetup->wValue,parity_name[(uint8_t)(pSetup->wValue>>8)],stop_name[(uint8_t)(pSetup->wValue>>11)]);
+        usbd_ftdi_set_line_coding(
+            _epid, actual_baudrate[_epid], 8,
+            0, 0);
+      }
       break;
     }
     case SIO_SET_DATA_REQUEST:
@@ -219,7 +226,8 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,
 
       break;
     case SIO_SET_LATENCY_TIMER_REQUEST:
-      Latency_Timer[_epid] = pSetup->wValueL;
+      // Latency_Timer[_epid] = pSetup->wValueL;
+      Latency_Timer[_epid] = 0x10;
       break;
     case SIO_GET_LATENCY_TIMER_REQUEST:
       *data = &Latency_Timer[_epid];
@@ -238,7 +246,7 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,
 static void usbd_ftdi_reset(void) {
   sof_tick = 0;
   for (size_t i = 0; i < 2; i++) {
-    Latency_Timer[i] = 0x0001;
+    Latency_Timer[i] = 0x0010;
   }
 }
 

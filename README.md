@@ -41,7 +41,7 @@ The flash tool is in tools/bflb_flash_tool directory, and input the command (rep
 Windows:
 .\bflb_mcu_tool.exe --chipname=bl702 --port=COM9 --xtal=32M --firmware="main.bin"
 Linux:
-./bflb_mcu_tool --chipname=bl702 --port=COM9 --xtal=32M --firmware="main.bin"
+./bflb_mcu_tool --chipname=bl702 --port=/dev/ttyACM0 --xtal=32M --firmware="main.bin"
 ~~~
 
 ~~~

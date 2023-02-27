@@ -15,7 +15,7 @@ Community Forum:  bbs.sipeed.com
 
 Sipeed RV-Debugger-Plus  (BL702C-A0)
 
-Purchase link: taobao.com/xxx
+Purchase link: Aliexpress
 
 Schematic: [BL702_USB2JTAG_3610_sch.pdf](hardware/BL702_USB2JTAG_3610_sch.pdf)
 
@@ -31,19 +31,44 @@ Assembly: [BL702_USB2JTAG_3610_asm.pdf](hardware/BL702_USB2JTAG_3610_asm.pdf)
 TODO
 
 # Firmware
-## Flash Tutorial
+## build firmware
 
-Press "boot" button then plug usb cable, and you will see "CDC Virtual ComPort" in device manager , remember the com number.
+To build usb2uartjtag firmware:
+
+~~~
+cd firmware/bl_mcu_sdk
+make clean
+make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag
+~~~
+
+The firmware is './out/app/usb2uartjtag/usb2uartjtag_bl702.bin'.
+
+To build usb2dualuart firmware:
+
+~~~
+cd firmware/bl_mcu_sdk
+make clean
+make BOARD=bl702_debugger APP_DIR=../app APP=usb2dualuart
+~~~
+The firmware is './out/app/usb2dualuart/usb2dualuart_bl702.bin'.
+
+## flash firmware to Sipeed RV-Debugger-Plus
+
+Hold "boot" button down, then plug usb cable to PC USB port, and you will see "CDC Virtual ComPort" in device manager , remember the com number.
 
 The flash tool is in tools/bflb_flash_tool directory, and input the command (replace port number and firmware name):
 
-~~~
 Windows:
-.\bflb_mcu_tool.exe --chipname=bl702 --port=COM9 --xtal=32M --firmware="main.bin"
-Linux:
-./bflb_mcu_tool --chipname=bl702 --port=/dev/ttyACM0 --xtal=32M --firmware="main.bin"
+~~~
+.\bflb_mcu_tool.exe --chipname=bl702 --port=COM9 --xtal=32M --firmware="<path to firmware.bin>"
 ~~~
 
+Linux:
+~~~
+./bflb_mcu_tool --chipname=bl702 --port=/dev/ttyACM0 --xtal=32M --firmware="<path to firmware.bin>"
+~~~
+
+The output looks like:
 ~~~
 tools\bflb_flash_tool> .\bflb_mcu_tool.exe --chipname=bl702 --port=COM9 --xtal=32M --firmware="main.bin"
 [22:07:28.296] - ==================================================
@@ -73,11 +98,13 @@ tools\bflb_flash_tool> .\bflb_mcu_tool.exe --chipname=bl702 --port=COM9 --xtal=3
 [22:07:31.289] - All time cost(ms): 2220.2548828125
 [22:07:31.390] - [All Success]
 ~~~
+
 Another GUI flash tool is BouffaloLabDevCube:
 - [Bouffalo Lab Dev Cube For Windows](https://dev.bouffalolab.com/media/upload/download/BouffaloLabDevCube-1.5.2-win32.zip)
 - [Bouffalo Lab Dev Cube For Ubuntu](https://dev.bouffalolab.com/media/upload/download/BouffaloLabDevCube-1.5.2-linux-x86.tar.gz)
 
 ## usb2uartjtag (default)
+
 Support JTAG+UART function
 
 UART support baudrate below 2Mbps, and 3Mbps, and some experimental baudrate (stability is not guaranteed):
@@ -104,48 +131,20 @@ TODO.
 
 ```
 RV-Debugger-BL702
-├── bsp
-│   ├── board
-│   │   └── bl702_debugger
-│   └── bsp_common
-│       └── platform
-├── common
-│   ├── device
-│   ├── libc
-│   ├── list
-│   ├── memheap
-│   ├── misc
-│   ├── partition
-│   ├── ring_buffer
-│   └── soft_crc
-├── components
-│   ├── shell
-│   └── usb_stack
-├── drivers
-│   └── bl702_driver
-├── examples
-│   └── usb
-│       ├── usb2uartjtag
-│       └── usb2dualuart
-├── out
-├── tools
-│   ├── bflb_flash_tool
-│   ├── cdk_flashloader
-│   ├── cmake
-│   └── openocd
-└── hardware
-    
+├── firmware
+│   ├── app
+│   │   ├── usb2dualuart
+│   │   └── usb2uartjtag
+│   └── bl_mcu_sdk
+├── hardware
+├── README.md
+└── res
 ```
 BL SDK usage tutorial refer to http://bouffalolab.gitee.io/bl_mcu_sdk/
 
-## Develop Guide
-### Build
-just "make"
-
 ### Code Explanation
-the main file is:
 ~~~
-examples/usb/usb2uartjtag:
+firmware/app/usb2uartjtag:
 ├── main.c
 ├── uart_interface.c
 ├── jtag_process.c
@@ -153,6 +152,4 @@ examples/usb/usb2uartjtag:
 components/usb_stack/class/vendor:
 └── usbd_ftdi.c      //all FTDI vendor request process, like baudrate set, dtr/rts set, Latency_Timer
 ~~~
-
-TODO
 

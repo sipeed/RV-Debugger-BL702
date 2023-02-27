@@ -52,7 +52,7 @@ make BOARD=bl702_debugger APP_DIR=../app APP=usb2dualuart
 ~~~
 The firmware is './out/app/usb2dualuart/usb2dualuart_bl702.bin'.
 
-## flash firmware to Sipeed RV-Debugger-Plus
+## flash firmware
 
 Hold "boot" button down, then plug usb cable to PC USB port, and you will see "CDC Virtual ComPort" in device manager , remember the com number.
 

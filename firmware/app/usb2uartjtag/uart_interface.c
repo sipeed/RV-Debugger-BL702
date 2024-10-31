@@ -48,43 +48,39 @@ Ring_Buffer_Type uart1_rx_rb;
 
 void uart_irq_callback(struct device *dev, void *args, uint32_t size,
                        uint32_t state) {
-  if (state == UART_EVENT_RX_FIFO) {
-    if (size && size < Ring_Buffer_Get_Empty_Length(&uart1_rx_rb)) {
-      Ring_Buffer_Write(&uart1_rx_rb, (uint8_t *)args, size);
-    } else {
-      MSG("RF\r\n");
-    }
-  } else if (state == UART_EVENT_RTO) {
-    if (size && size < Ring_Buffer_Get_Empty_Length(&uart1_rx_rb)) {
-      Ring_Buffer_Write(&uart1_rx_rb, (uint8_t *)args, size);
-    } else {
-      MSG("RTO\r\n");
-    }
-  } else if (state == UART_RX_FER_IT) {
-    MSG("ov\r\n");
+  switch (state) {
+    case UART_EVENT_RX_FIFO:
+    case UART_EVENT_RTO:
+      if (size && size < Ring_Buffer_Get_Empty_Length(&uart1_rx_rb)) {
+        Ring_Buffer_Write(&uart1_rx_rb, (uint8_t *)args, size);
+      } else {
+        MSG(state == UART_EVENT_RX_FIFO ? "RF\r\n" : "RTO\r\n");
+      }
+      break;
+    case UART_RX_FER_IT:
+      MSG("OV\r\n");
+      break;
+    default:
+      break;
   }
 }
+
 void uart1_init(void) {
   uart_register(UART1_INDEX, "uart1");
+  dma_register(DMA0_CH2_INDEX, "ch2");
   uart1 = device_find("uart1");
+  dma_ch2 = device_find("ch2");
 
-  if (uart1) {
+  if (uart1 && dma_ch2) {
     device_open(
-        uart1, DEVICE_OFLAG_DMA_TX | DEVICE_OFLAG_INT_RX);  // uart0 tx dma mode
-    device_control(uart1, DEVICE_CTRL_SUSPEND, NULL);
+        uart1, DEVICE_OFLAG_DMA_TX | DEVICE_OFLAG_INT_RX);  // uart tx dma mode
+//    device_control(uart1, DEVICE_CTRL_SUSPEND, NULL);
     device_set_callback(uart1, uart_irq_callback);
     device_control(uart1, DEVICE_CTRL_SET_INT,
                    (void *)(UART_RX_FIFO_IT | UART_RTO_IT));
-  }
-
-  dma_register(DMA0_CH2_INDEX, "ch2");
-  dma_ch2 = device_find("ch2");
-  if (dma_ch2) {
     device_open(dma_ch2, 0);
-    // device_set_callback(dma_ch2, NULL);
-    // device_control(dma_ch2, DEVICE_CTRL_SET_INT, NULL);
+    device_control(uart1, DEVICE_CTRL_ATTACH_TX_DMA, dma_ch2);
   }
-  // device_control(uart1, DEVICE_CTRL_ATTACH_TX_DMA, dma_ch2);
 }
 
 void uart1_config(uint32_t baudrate, uart_databits_t databits,
@@ -105,6 +101,7 @@ void uart1_config(uint32_t baudrate, uart_databits_t databits,
   }
 
   device_control(uart1, DEVICE_CTRL_CONFIG, &cfg);
+  device_control(uart1, DEVICE_CTRL_RESUME, NULL);
 }
 
 static uint8_t uart1_dtr;

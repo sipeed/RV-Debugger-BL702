@@ -60,11 +60,7 @@ static void usbd_ftdi_reset(void)
 #define SIO_XON_XOFF_HS (0x4 << 8)
 
 #define SIO_SET_DTR_MASK 0x1
-#define SIO_SET_DTR_HIGH ( 1 | ( SIO_SET_DTR_MASK  << 8))
-#define SIO_SET_DTR_LOW  ( 0 | ( SIO_SET_DTR_MASK  << 8))
 #define SIO_SET_RTS_MASK 0x2
-#define SIO_SET_RTS_HIGH ( 2 | ( SIO_SET_RTS_MASK << 8 ))
-#define SIO_SET_RTS_LOW ( 0 | ( SIO_SET_RTS_MASK << 8 ))
 
 #define SIO_RTS_CTS_HS (0x1 << 8)
 
@@ -113,26 +109,12 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 			break;
 
 		case SIO_SET_MODEM_CTRL_REQUEST:
-			if(pSetup->wValue == SIO_SET_DTR_HIGH)
-			{
-				//USBD_LOG("DTR 1\r\n");
-				usbd_ftdi_set_dtr(true);
+			if (pSetup->wValue & (SIO_SET_DTR_MASK << 8)) {
+				usbd_ftdi_set_dtr(pSetup->wValue & SIO_SET_DTR_MASK);
 			}
-			else if(pSetup->wValue == SIO_SET_DTR_LOW)
-			{
-				//USBD_LOG("DTR 0\r\n");
-				usbd_ftdi_set_dtr(false);
+			if (pSetup->wValue & (SIO_SET_RTS_MASK << 8)) {
+				usbd_ftdi_set_rts(pSetup->wValue & SIO_SET_RTS_MASK);
 			}
-			else if(pSetup->wValue == SIO_SET_RTS_HIGH)
-			{
-				//USBD_LOG("RTS 1\r\n");
-				usbd_ftdi_set_rts(true);
-			}
-			else if(pSetup->wValue == SIO_SET_RTS_LOW)
-			{
-				//USBD_LOG("RTS 0\r\n");
-				usbd_ftdi_set_rts(false);
-			}			
 			break;
 		case SIO_SET_FLOW_CTRL_REQUEST:
 

@@ -102,6 +102,9 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len)
 {
 	static uint32_t actual_baudrate = 1200;
+	static uint8_t line_parity = 8;
+	static uint8_t line_databits = 0;
+	static uint8_t line_stopbits = 0;
 	switch (pSetup->bRequest) 
 	{
 		case SIO_READ_EEPROM_REQUEST:
@@ -143,7 +146,7 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 			ftdi_set_baudrate(pSetup->wValue|(baudrate_high<<16),&actual_baudrate);	
 			if(actual_baudrate != 1200)
 			{
-				usbd_ftdi_set_line_coding(actual_baudrate, 8, 0, 0);
+				usbd_ftdi_set_line_coding(actual_baudrate, line_databits, line_parity, line_stopbits);
 			}
 			break;	
 		}
@@ -157,7 +160,10 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		 	if(actual_baudrate != 1200)
 			{
 				//USBD_LOG("CDC_SET_LINE_CODING <%d %d %s %s>\r\n",actual_baudrate,(uint8_t)pSetup->wValue,parity_name[(uint8_t)(pSetup->wValue>>8)],stop_name[(uint8_t)(pSetup->wValue>>11)]);
-				usbd_ftdi_set_line_coding(actual_baudrate,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
+				line_databits = (uint8_t)(pSetup->wValue);
+				line_parity   = (uint8_t)(pSetup->wValue >> 8)  & 0x07;
+				line_stopbits = (uint8_t)(pSetup->wValue >> 11) & 0x03;
+				usbd_ftdi_set_line_coding(actual_baudrate, line_databits, line_parity, line_stopbits);			
 			}
 			break;
 

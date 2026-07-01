@@ -87,9 +87,16 @@ void uart1_config(uint32_t baudrate, uart_databits_t databits,
                   uart_parity_t parity, uart_stopbits_t stopbits) {
   uart_param_cfg_t cfg;
   cfg.baudrate = baudrate;
-  cfg.stopbits = stopbits;
   cfg.parity = parity;
 
+  if (stopbits == 1) {
+    cfg.stopbits = UART_STOP_ONE_D_FIVE;
+  } else if (stopbits == 2) {
+    cfg.stopbits = UART_STOP_TWO;
+  } else {
+    cfg.stopbits = UART_STOP_ONE;
+  }
+    
   if (databits == 5) {
     cfg.databits = UART_DATA_LEN_5;
   } else if (databits == 6) {

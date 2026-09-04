@@ -180,6 +180,24 @@ for example, 11200bps -> 12Mbps
 
 The production board has one BL702 LED on GPIO24 (RX/TX indication).
 
+### Gowin Programmer frequency and GAO
+
+`--frequency` is the host-side JTAG TCK target used for bitstream
+configuration/control/readback; it is not the GAO sample rate. The GAO sample
+clock comes from the FPGA user design (`osc_clk` in the probe), and the GAO
+capture transaction can request a separate JTAG TCK. The installed
+`programmer_cli` help reports a 2.5 MHz default, although a GUI may retain a
+15 MHz selection.
+
+The current BL702 bridge consumes FTDI MPSSE `0x86` clock-divisor commands but
+does not yet apply the divisor to its GPIO bit-banger. Therefore selecting
+15 MHz does not make the physical TCK 15 MHz, but it still changes the host
+MPSSE stream and timing assumptions. On the Tang Nano 9K fixture, 15 MHz
+SRAM/GAO download and capture passed, whereas 15 MHz embFlash programming
+failed; the full embFlash and reload sequence passed at 1 MHz. Use 1 MHz for
+production embFlash and as the universal bridge setting until divisor support
+is implemented.
+
 JTAG function is verified for :
 
 - RV32 Xuantie E906/E907

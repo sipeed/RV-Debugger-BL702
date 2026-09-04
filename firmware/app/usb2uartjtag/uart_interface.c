@@ -51,13 +51,13 @@ void uart_irq_callback(struct device *dev, void *args, uint32_t size,
   switch (state) {
     case UART_EVENT_RX_FIFO:
     case UART_EVENT_RTO:
-      if (size && size < Ring_Buffer_Get_Empty_Length(&uart1_rx_rb)) {
+      if (size && size <= Ring_Buffer_Get_Empty_Length(&uart1_rx_rb)) {
         Ring_Buffer_Write(&uart1_rx_rb, (uint8_t *)args, size);
       } else {
         MSG(state == UART_EVENT_RX_FIFO ? "RF\r\n" : "RTO\r\n");
       }
       break;
-    case UART_RX_FER_IT:
+    case UART_EVENT_RX_FER:
       MSG("OV\r\n");
       break;
     default:
@@ -83,9 +83,9 @@ void uart1_init(void) {
   }
 }
 
-void uart1_config(uint32_t baudrate, uart_databits_t databits,
+void uart1_config(uint32_t baudrate, uint8_t databits,
                   uart_parity_t parity, uart_stopbits_t stopbits) {
-  uart_param_cfg_t cfg;
+  uart_param_cfg_t cfg = {0};
   cfg.baudrate = baudrate;
   cfg.stopbits = stopbits;
   cfg.parity = parity;
@@ -96,14 +96,39 @@ void uart1_config(uint32_t baudrate, uart_databits_t databits,
     cfg.databits = UART_DATA_LEN_6;
   } else if (databits == 7) {
     cfg.databits = UART_DATA_LEN_7;
-  } else if (databits == 8) {
+  } else {
     cfg.databits = UART_DATA_LEN_8;
   }
 
-  device_control(uart1, DEVICE_CTRL_CONFIG, &cfg);
-  device_control(uart1, DEVICE_CTRL_RESUME, NULL);
+  if (uart1) {
+    device_control(uart1, DEVICE_CTRL_SUSPEND, NULL);
+    device_control(uart1, DEVICE_CTRL_CONFIG, &cfg);
+    device_control(uart1, DEVICE_CTRL_RESUME, NULL);
+  }
 }
 
+void uart1_purge(uint8_t request) {
+  /* FTDI SIO_RESET uses 0 for a full reset, 1 for PURGE_RX (device to
+   * host), and 2 for PURGE_TX (host to device). */
+  if (request == 0 || request == 1) {
+    Ring_Buffer_Reset(&uart1_rx_rb);
+    if (uart1) {
+      device_control(uart1, DEVICE_CTRL_UART_CLEAR_RX_FIFO, NULL);
+    }
+  }
+
+  if (request == 0 || request == 2) {
+    Ring_Buffer_Reset(&usb_rx_rb);
+    if (dma_ch2) {
+      dma_channel_stop(dma_ch2);
+    }
+    if (uart1) {
+      device_control(uart1, DEVICE_CTRL_UART_CLEAR_TX_FIFO, NULL);
+    }
+  }
+}
+
+#if UART1_HAS_MODEM_CONTROL
 static uint8_t uart1_dtr;
 static uint8_t uart1_rts;
 
@@ -118,6 +143,21 @@ void uart1_dtr_deinit(void) { gpio_set_mode(uart1_dtr, GPIO_INPUT_MODE); }
 void uart1_rts_deinit(void) { gpio_set_mode(uart1_rts, GPIO_INPUT_MODE); }
 void dtr_pin_set(uint8_t status) { gpio_write(uart1_dtr, status); }
 void rts_pin_set(uint8_t status) { gpio_write(uart1_rts, status); }
+#else
+/* Tang Nano 9K 3674 routes GPIO28 to Boot_Strap and GPIO24 to LED_STATE;
+ * neither may be driven by FTDI modem-control requests.  Keep the legacy
+ * API as no-ops so the USB class remains source-compatible. */
+void uart1_set_dtr_rts(uint8_t dtr, uint8_t rts) {
+  (void)dtr;
+  (void)rts;
+}
+void uart1_dtr_init(void) {}
+void uart1_rts_init(void) {}
+void uart1_dtr_deinit(void) {}
+void uart1_rts_deinit(void) {}
+void dtr_pin_set(uint8_t status) { (void)status; }
+void rts_pin_set(uint8_t status) { (void)status; }
+#endif
 void ringbuffer_lock() { cpu_global_irq_disable(); }
 void ringbuffer_unlock() { cpu_global_irq_enable(); }
 

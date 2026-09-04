@@ -22,11 +22,13 @@
  */
 #include "usbd_core.h"
 #include "usbd_ftdi.h"
+#include "uart_interface.h"
 
 extern const uint16_t ftdi_eeprom_info[];
 static volatile uint32_t sof_tick = 0;
 static uint8_t Latency_Timer1 = 0x0004;
 static uint8_t Latency_Timer2 = 0x0004;
+static uint8_t ftdi_modem_status[2] = {0x31, 0x60};
 const char *stop_name[] = {"1", "1.5", "2"};
 const char *parity_name[] = {"N","O","E","M","S"};
 
@@ -56,6 +58,12 @@ static void usbd_ftdi_reset(void)
 
 #define SIO_DISABLE_FLOW_CTRL 0x0
 #define SIO_RTS_CTS_HS (0x1 << 8)
+
+#define FTDI_INTERFACE_JTAG 1
+#define FTDI_INTERFACE_UART 2
+#define SIO_RESET_SIO 0
+#define SIO_RESET_PURGE_RX 1
+#define SIO_RESET_PURGE_TX 2
 #define SIO_DTR_DSR_HS (0x2 << 8)
 #define SIO_XON_XOFF_HS (0x4 << 8)
 
@@ -89,9 +97,9 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 	{
 		baudrate = FTDI_USB_CLK / divisor;
 	}
-	if(baudrate>100000 && baudrate < 12000)
+	if(baudrate > 10000 && baudrate < 12000)
 	{
-		*actual_baudrate = (baudrate - 100000)*100000;
+		*actual_baudrate = (baudrate - 10000) * 10000;
 	}
 	else
 		*actual_baudrate = baudrate;
@@ -101,7 +109,10 @@ static void ftdi_set_baudrate(uint32_t  itdf_divisor, uint32_t *actual_baudrate)
 //static char datatmp[2]={0x32, 0x60};
 static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t **data,uint32_t *len)
 {
-	static uint32_t actual_baudrate = 1200;
+	static uint32_t actual_baudrate[2] = {1200, 115200};
+	uint8_t interface = pSetup->wIndexL;
+	uint8_t port = (interface >= FTDI_INTERFACE_JTAG &&
+				interface <= FTDI_INTERFACE_UART) ? interface - 1 : 0xff;
 	switch (pSetup->bRequest) 
 	{
 		case SIO_READ_EEPROM_REQUEST:
@@ -109,10 +120,22 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 			*len = 2;
 			break;
 		case SIO_RESET_REQUEST:
-
+			if (interface == FTDI_INTERFACE_JTAG) {
+				jtag_mpsse_reset();
+			} else if (interface == FTDI_INTERFACE_UART &&
+				   (pSetup->wValueL == SIO_RESET_SIO ||
+					pSetup->wValueL == SIO_RESET_PURGE_RX ||
+					pSetup->wValueL == SIO_RESET_PURGE_TX)) {
+				uart1_purge(pSetup->wValueL);
+			}
 			break;
 
 		case SIO_SET_MODEM_CTRL_REQUEST:
+			/* Channel A is MPSSE/JTAG.  Only channel B owns UART1 and its
+			 * modem-control GPIOs. */
+			if (interface != FTDI_INTERFACE_UART) {
+				break;
+			}
 			if(pSetup->wValue == SIO_SET_DTR_HIGH)
 			{
 				//USBD_LOG("DTR 1\r\n");
@@ -138,12 +161,16 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 
 			break;
 		case SIO_SET_BAUDRATE_REQUEST://wValue，2个字节波特率
-		{	
+		{
+			if (port == 0xff) {
+				break;
+			}
 			uint8_t baudrate_high = (pSetup->wIndex >> 8);
-			ftdi_set_baudrate(pSetup->wValue|(baudrate_high<<16),&actual_baudrate);	
-			if(actual_baudrate != 1200)
+			ftdi_set_baudrate(pSetup->wValue | (baudrate_high << 16),
+						  &actual_baudrate[port]);
+			if(interface == FTDI_INTERFACE_UART && actual_baudrate[port] != 1200)
 			{
-				usbd_ftdi_set_line_coding(actual_baudrate, 8, 0, 0);
+				usbd_ftdi_set_line_coding(actual_baudrate[port], 8, 0, 0);
 			}
 			break;	
 		}
@@ -154,10 +181,14 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		 * D11-D12 		STOP_BIT_1=0, STOP_BIT_15=1, STOP_BIT_2=2 
 		 * D14  		BREAK_OFF=0, BREAK_ON=1
 		 **/
-		 	if(actual_baudrate != 1200)
+			if(interface == FTDI_INTERFACE_UART && port != 0xff &&
+			   actual_baudrate[port] != 1200)
 			{
 				//USBD_LOG("CDC_SET_LINE_CODING <%d %d %s %s>\r\n",actual_baudrate,(uint8_t)pSetup->wValue,parity_name[(uint8_t)(pSetup->wValue>>8)],stop_name[(uint8_t)(pSetup->wValue>>11)]);
-				usbd_ftdi_set_line_coding(actual_baudrate,(uint8_t)pSetup->wValue,(uint8_t)(pSetup->wValue>>8),(uint8_t)(pSetup->wValue>>11));
+				usbd_ftdi_set_line_coding(actual_baudrate[port],
+						(uint8_t)(pSetup->wValue & 0xff),
+						(uint8_t)((pSetup->wValue >> 8) & 0x07),
+						(uint8_t)((pSetup->wValue >> 11) & 0x03));
 			}
 			break;
 
@@ -193,7 +224,7 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 		- B5       Transmitter holding register (THRE)
 		- B6       Transmitter empty (TEMT)
 		- B7       Error in RCVR FIFO */		
-			*data = (uint8_t*)&ftdi_eeprom_info[2];
+				*data = ftdi_modem_status;
 			*len = 2;
 			break;		
 		case SIO_SET_EVENT_CHAR_REQUEST:
@@ -203,16 +234,18 @@ static int ftdi_vendor_request_handler(struct usb_setup_packet *pSetup,uint8_t *
 
 			break;		
 		case SIO_SET_LATENCY_TIMER_REQUEST:
-			if(pSetup->wIndexL == 1)
+			if(interface == FTDI_INTERFACE_JTAG)
 				Latency_Timer1 = pSetup->wValueL;
-			else
+			else if(interface == FTDI_INTERFACE_UART)
 				Latency_Timer2 = pSetup->wValueL;
 			break;		
 		case SIO_GET_LATENCY_TIMER_REQUEST:
-			if(pSetup->wIndexL == 1)
+			if(interface == FTDI_INTERFACE_JTAG)
 				*data = &Latency_Timer1;
-			else
+			else if(interface == FTDI_INTERFACE_UART)
 				*data = &Latency_Timer2;
+			else
+				return -1;
 			*len = 1;
 			//USBD_LOG("get latency:%d,len:%d\r\n",Latency_Timer1,*len);
 			break;							

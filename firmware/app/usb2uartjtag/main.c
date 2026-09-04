@@ -23,11 +23,13 @@
 #include "hal_usb.h"
 #include "usbd_core.h"
 #include "usbd_ftdi.h"
+#include "usb_descriptor.h"
 #include "uart_interface.h"
 #include "bl702_ef_ctrl.h"
 #include "bl702_usb.h"
 #include "bl702_glb.h"
 #include "hal_gpio.h"
+#include "hal_mtimer.h"
 #include "io_cfg.h"
 
 /*
@@ -53,22 +55,35 @@ usbd_class_t cdc_class0;
 usbd_interface_t cdc_data_intf0;
 usbd_class_t cdc_class1;
 usbd_interface_t cdc_data_intf1;
-extern uint8_t cdc_descriptor[];
 struct device *usb_fs;
 
 
 /************************  led ctrl functions  ************************/
-static uint32_t led_pins[2] = {LED0_PIN, LED1_PIN};
-static volatile uint8_t led_stat[2] = {0, 0};
+/* The production Tang Nano 9K has one BL702-controlled LED (LED_STATE).
+ * Keep the indexed API used by the USB/UART paths so older diagnostics can
+ * still call led_toggle(0), while out-of-range legacy LED1 calls are safe. */
+#ifndef LED_COUNT
+#define LED_COUNT 1
+#endif
+#if LED_COUNT > 1
+static uint32_t led_pins[LED_COUNT] = {LED0_PIN, LED1_PIN};
+#else
+static uint32_t led_pins[LED_COUNT] = {LED0_PIN};
+#endif
+static volatile uint8_t led_stat[LED_COUNT] = {0};
 static void led_gpio_init(void)
 {
-    gpio_set_mode(led_pins[0], GPIO_OUTPUT_MODE);
-    gpio_set_mode(led_pins[1], GPIO_OUTPUT_MODE);
+    for (uint8_t idx = 0; idx < LED_COUNT; idx++) {
+        gpio_set_mode(led_pins[idx], GPIO_OUTPUT_MODE);
+    }
 	return;
 }
 
 void led_set(uint8_t idx, uint8_t status)
 {
+    if (idx >= LED_COUNT) {
+        return;
+    }
     gpio_write(led_pins[idx], !status);
 	led_stat[idx] = status;
 	return;
@@ -76,6 +91,9 @@ void led_set(uint8_t idx, uint8_t status)
 
 void led_toggle(uint8_t idx)
 {
+	if (idx >= LED_COUNT) {
+		return;
+	}
 	led_stat[idx] = !led_stat[idx];
     gpio_write(led_pins[idx], !led_stat[idx]);
 	return;
@@ -84,33 +102,79 @@ void led_toggle(uint8_t idx)
 /************************  API for usbd_ftdi  ************************/
 void usbd_ftdi_set_line_coding(uint32_t baudrate, uint8_t databits, uint8_t parity, uint8_t stopbits)
 {
-    uart1_config(baudrate, databits, parity, stopbits);
+    uart_parity_t uart_parity;
+    uart_stopbits_t uart_stopbits;
+
+    /* FTDI encodes 1/1.5/2 stop bits as 0/1/2, while the BL702 HAL uses
+     * 1/2/3 (0 means 0.5 stop bit).  Do not pass the FTDI value through. */
+    switch (stopbits & 0x03) {
+        case 1:
+            uart_stopbits = UART_STOP_ONE_D_FIVE;
+            break;
+        case 2:
+            uart_stopbits = UART_STOP_TWO;
+            break;
+        case 0:
+        default:
+            uart_stopbits = UART_STOP_ONE;
+            break;
+    }
+
+    switch (parity & 0x07) {
+        case 1:
+            uart_parity = UART_PAR_ODD;
+            break;
+        case 2:
+            uart_parity = UART_PAR_EVEN;
+            break;
+        case 0:
+        default:
+            uart_parity = UART_PAR_NONE;
+            break;
+    }
+
+    Ring_Buffer_Reset(&uart1_rx_rb);
+    Ring_Buffer_Reset(&usb_rx_rb);
+    uart1_config(baudrate, databits, uart_parity, uart_stopbits);
+    MSG("[uart1] line coding %lu,%u,%u,%u\r\n", baudrate, databits,
+        parity & 0x07, stopbits & 0x03);
 }
 
 void usbd_ftdi_set_dtr(bool dtr)
 {
+#if UART1_HAS_MODEM_CONTROL
     dtr_pin_set(!dtr);
+#else
+    /* GPIO28 is Boot_Strap on Tang Nano 9K 3674; there is no DTR net. */
+    (void)dtr;
+#endif
 }
 
 void usbd_ftdi_set_rts(bool rts)
 {
+#if UART1_HAS_MODEM_CONTROL
     rts_pin_set(!rts);
+#else
+    /* GPIO24 is LED_STATE and GPIO25 is NC; neither is RTS. */
+    (void)rts;
+#endif
 }
 
 
 /************************  USB UART logic for latency timer  ************************/
 static volatile uint32_t temp_tick2 = 0;	//tick for uart port
-static volatile uint32_t temp_tick1 = 0;	//tick for uart port
-uint64_t last_send = 0;
+static volatile uint32_t temp_tick1 = 0;	//tick for jtag port
+static uint64_t last_send[2] = {0, 0};
 
-extern  uint32_t mpsse_status;
 // UART RX -> USB IN
 uint16_t usb_dc_ftdi_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, uint8_t ep)
 {
     uint8_t ep_idx;
+    uint8_t channel;
     uint32_t timeout = 0x00FFFFFF;
 
     ep_idx = USB_EP_GET_IDX(ep);
+    channel = (ep_idx - 1) / 2;
     /* Check if IN ep */
     if (USB_EP_GET_DIR(ep) != USB_EP_DIR_IN)
     {
@@ -131,45 +195,41 @@ uint16_t usb_dc_ftdi_send_from_ringbuffer(struct device *dev, Ring_Buffer_Type *
 
     if ((USB_Get_EPx_TX_FIFO_CNT(ep_idx) == USB_FS_MAX_PACKET_SIZE) && Ring_Buffer_Get_Length(rb))
     {
-        uint8_t ftdi_header[2] = {0x01,0x60};
-		MSG("*");
+        uint8_t ftdi_header[2] = {0x31,0x60};
         memcopy_to_fifo((void *)addr,ftdi_header,2);
         Ring_Buffer_Read_Callback(rb, USB_FS_MAX_PACKET_SIZE-2, memcopy_to_fifo, (void *)addr);
         USB_Set_EPx_Rdy(ep_idx);
 		led_toggle(0);	//RX indication
-		last_send = mtimer_get_time_us();
+		last_send[channel] = mtimer_get_time_us();
         return 0;
     }
     else
     {
 		/*uint64_t Latency_Timer = (ep_idx - 1)==0?usbd_ftdi_get_latency_timer1():usbd_ftdi_get_latency_timer2();	//超时才发
 		if(mtimer_get_time_us()-last_send>Latency_Timer*1000) {
-			uint8_t ftdi_header[2] = {0x01,0x60};       
+			uint8_t ftdi_header[2] = {0x31,0x60};       
 			memcopy_to_fifo((void *)addr,ftdi_header,2);
 			USB_Set_EPx_Rdy(ep_idx);
-			last_send = mtimer_get_time_us();
+			last_send[channel] = mtimer_get_time_us();
 			//MSG("Port%d refresh\r\n", ep_idx);
 			return -USB_DC_RB_SIZE_SMALL_ERR;
 		}*/
 		
-        if(ep_idx == CDC_IN_EP) //UART
+        if(ep == CDC_IN_EP) //UART
         {
             if((uint32_t)(usbd_ftdi_get_sof_tick()-temp_tick2) >= usbd_ftdi_get_latency_timer2())
             {
-                uint8_t ftdi_header[2] = {0x01,0x60};     
+                uint8_t ftdi_header[2] = {0x31,0x60};     
                 temp_tick2 = usbd_ftdi_get_sof_tick();                 
                 memcopy_to_fifo((void *)addr,ftdi_header,2);
                 USB_Set_EPx_Rdy(ep_idx);
             }
         }
-        else	//0x81, JTAG
+		else if (ep == JTAG_IN_EP)	//0x81, JTAG
         {
-            //if((uint32_t)(usbd_ftdi_get_sof_tick()-temp_tick1) >= usbd_ftdi_get_latency_timer1())
-			//if(mpsse_status != 12)
-			//MSG("#");
-			if(mtimer_get_time_us()-last_send>1000)
+			if(mtimer_get_time_us()-last_send[channel]>1000)
             {
-				uint8_t ftdi_header[2] = {0x01,0x60};     
+				uint8_t ftdi_header[2] = {0x31,0x60};     
 				temp_tick1 = usbd_ftdi_get_sof_tick();  				
 				memcopy_to_fifo((void *)addr,ftdi_header,2);
 				USB_Set_EPx_Rdy(ep_idx);
@@ -186,7 +246,7 @@ int usb_dc_ftdi_receive_to_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, 
     uint8_t ep_idx;
     uint8_t recv_len;
     uint32_t timeout = 0x00FFFFFF;
-    static bool overflow_flag = false;
+    static bool overflow_flag[8] = {false};
 
     /* Check if OUT ep */
     if (USB_EP_GET_DIR(ep) != USB_EP_DIR_OUT)
@@ -211,9 +271,9 @@ int usb_dc_ftdi_receive_to_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, 
     /*if rx fifo count equal 0,it means last is send nack and ringbuffer is smaller than 64,
     * so,if ringbuffer is larger than 64,set ack to recv next data.
     */
-    if(overflow_flag && (Ring_Buffer_Get_Empty_Length(rb)>64) && (!recv_len))
+    if(overflow_flag[ep_idx] && (Ring_Buffer_Get_Empty_Length(rb)>64) && (!recv_len))
     {
-        overflow_flag = false;
+        overflow_flag[ep_idx] = false;
         USB_Set_EPx_Rdy(ep_idx);
         return 0;
     }
@@ -224,7 +284,7 @@ int usb_dc_ftdi_receive_to_ringbuffer(struct device *dev, Ring_Buffer_Type *rb, 
 
         if(Ring_Buffer_Get_Empty_Length(rb) < 64)
         {
-            overflow_flag = true;
+            overflow_flag[ep_idx] = true;
             return -USB_DC_RB_SIZE_SMALL_ERR;
         }
         USB_Set_EPx_Rdy(ep_idx);
@@ -274,46 +334,32 @@ usbd_endpoint_t cdc_in_ep0 =
 
 
 //for dbg chip id
-static void hexarr2string(uint8_t *hexarray,int length,uint8_t *string)
-{
-	unsigned char num2string_table[] = "0123456789ABCDEF";
-    int i = 0;
-	while(i < length)
-	{
-	    *(string++) = num2string_table[((hexarray[i] >> 4) & 0x0f)];
-		*(string++) = num2string_table[(hexarray[i] & 0x0f)];
-		i++;
-	}
-	return;
-}
-
 int main(void)
 {
     uint8_t chipid[8];
-    uint8_t chipid2[6];
     GLB_Select_Internal_Flash();
     bflb_platform_init(0);
+    MSG("[usb2uartjtag] boot\r\n");
     uart_ringbuffer_init();
     uart1_init();
-    uart1_set_dtr_rts(UART_DTR_PIN,UART_RTS_PIN);
+    uart1_config(115200, 8, UART_PAR_NONE, UART_STOP_ONE);
+    MSG("[uart1] default 115200,8N1 GPIO26/TX GPIO27/RX\r\n");
+#if UART1_HAS_MODEM_CONTROL
+    uart1_set_dtr_rts(UART_DTR_PIN, UART_RTS_PIN);
     uart1_dtr_init();
     uart1_rts_init();
+#endif
     led_gpio_init();
 	led_set(0, 1);	//led0 for RX/TX indication
+#if LED_COUNT > 1
 	led_set(1, 1);	//led1 for Power indication
+#endif
     jtag_ringbuffer_init();
     jtag_gpio_init();
+    MSG("[usb2uartjtag] uart+jtag initialized\r\n");
     EF_Ctrl_Read_Chip_ID(chipid);
-    // hexarr2string(&chipid[2],3,chipid2);
     // bflb_platform_dump(chipid,8);
-    // bflb_platform_dump(chipid2,6);
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24] = 	0x00; //chipid2[0];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+2] = 	0x11; //chipid2[1];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+4] = 	0x22; //chipid2[2];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+6] = 	0x33; //chipid2[3];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+8] = 	0x44; //chipid2[4];
-    cdc_descriptor[0x12+0x37+0x04+0x0a+0x1c+0x24+10] = 	0x55; //chipid2[5];
-    usbd_desc_register(cdc_descriptor);
+    usb_descriptor_register(chipid);
 
     usbd_ftdi_add_interface(&cdc_class0,&cdc_data_intf0);
     usbd_interface_add_endpoint(&cdc_data_intf0,&cdc_out_ep0);
@@ -329,8 +375,10 @@ int main(void)
         device_control(usb_fs, DEVICE_CTRL_SET_INT, (void *)(USB_SOF_IT|USB_EP2_DATA_OUT_IT | USB_EP1_DATA_IN_IT|USB_EP4_DATA_OUT_IT|USB_EP3_DATA_IN_IT));
     }
     while(!usb_device_is_configured()){};
-    
+    MSG("[usb2uartjtag] usb configured\r\n");
+
 	led_toggle(0);
+    MSG("[usb2uartjtag] main loop\r\n");
     while (1)
     {
         uart_send_from_ringbuffer();

@@ -107,6 +107,69 @@ Another GUI flash tool is BouffaloLabDevCube:
 
 Support JTAG+UART function
 
+### Windows openFPGALoader
+
+The usb2uartjtag firmware uses USB device revision `0501`. Interface A is the
+JTAG/MPSSE interface and interface B is the UART interface. On Windows,
+openFPGALoader uses libusb, so interface A must use WinUSB. Interface B can
+continue using the FTDI serial driver.
+
+The driver package matches only this hardware ID:
+
+~~~
+USB\VID_0403&PID_6010&REV_0501&MI_00
+~~~
+
+It therefore does not match a real FT2232H with revision `0500`. To generate,
+sign, and install the development driver, install the Windows Driver Kit and
+run the following from an elevated PowerShell prompt:
+
+~~~powershell
+Set-ExecutionPolicy -Scope Process Bypass
+.\driver\windows\install-development-driver.ps1
+~~~
+
+The script installs a local development certificate. It checks that connected
+real FTDI `REV_0500` interface-A devices still use `FTDIBUS` after installation.
+
+Find the BL702 bus/device number and then use interface A with openFPGALoader:
+
+~~~powershell
+openFPGALoader.exe --scan-usb
+openFPGALoader.exe -c ft2232 --ftdi-channel 0 --busdev-num 001:018 --freq 1000000 --detect
+openFPGALoader.exe -c ft2232 --ftdi-channel 0 --busdev-num 001:018 --freq 1000000 --write-sram design.fs
+openFPGALoader.exe -c ft2232 --ftdi-channel 0 --busdev-num 001:018 --freq 1000000 --write-flash --reset design.fs
+~~~
+
+Replace `001:018` with the value printed by `--scan-usb`. The firmware serial
+has the form `BL702_FTDI_<chip-id>`, so it can also be supplied with
+`--ftdi-serial` when multiple probes are connected.
+
+Interface B remains a normal FTDI serial port (`FTDIBUS` on Windows). Its USB
+OUT endpoint `0x04` is bridged to UART1 TX/GPIO26 through DMA, and UART1
+RX/GPIO27 is returned through USB IN endpoint `0x83`. Line coding and modem
+control are isolated from interface A; FTDI reset/purge requests clear the
+corresponding UART queues and FIFOs. On the Tang Nano 9K 3674 production
+board, DTR/RTS/CTS are intentionally ignored: GPIO28 is `Boot_Strap`, GPIO24
+is `LED_STATE`, and GPIO25 is NC. The default format is 115200 8N1.
+
+### Tang Nano 9K 3674 production pin map
+
+The production wiring follows the [Tang_nano_9K_3674 schematic](https://dl.sipeed.com/fileList/TANG/Nano%209K/2_Schematic/Tang_nano_9K_3674_schematics.pdf):
+
+| Function | BL702 GPIO | FPGA/package net |
+| --- | ---: | --- |
+| UART1 TX | 26 | `FPGA_RX`, pin 18 (through R45) |
+| UART1 RX | 27 | `FPGA_TX`, pin 17 (through R46) |
+| JTAG TMS | 14 | `IOL11A_JTAG_TMS`, pin 5 |
+| JTAG TCK | 23 | `IOL11B_JTAG_TCK`, pin 6 |
+| JTAG TDI | 17 | `IOL12B_JTAG_TDI`, pin 7 |
+| JTAG TDO | 15 | `IOL13A_JTAG_TDO`, pin 8 |
+| Status LED | 24 | `LED_STATE` (active low) |
+
+GPIO2 is left as an optional UART0 TX probe for development logs and is NC on
+the production board; it is not part of the JTAG/UART functional route.
+
 UART support baudrate below 2Mbps, and 3Mbps, and some experimental baudrate (stability is not guaranteed):
 
 ~~~
@@ -115,7 +178,7 @@ we remap baudrate in 10000~12000 to (baud-10000)*10000
 for example, 11200bps -> 12Mbps
 ~~~
 
-LED0 for RX indication, LED1 for TX indication.
+The production board has one BL702 LED on GPIO24 (RX/TX indication).
 
 JTAG function is verified for :
 
@@ -152,4 +215,3 @@ firmware/app/usb2uartjtag:
 components/usb_stack/class/vendor:
 └── usbd_ftdi.c      //all FTDI vendor request process, like baudrate set, dtr/rts set, Latency_Timer
 ~~~
-

@@ -192,11 +192,14 @@ capture transaction can request a separate JTAG TCK. The installed
 The current BL702 bridge consumes FTDI MPSSE `0x86` clock-divisor commands but
 does not yet apply the divisor to its GPIO bit-banger. Therefore selecting
 15 MHz does not make the physical TCK 15 MHz, but it still changes the host
-MPSSE stream and timing assumptions. On the Tang Nano 9K fixture, 15 MHz
-SRAM/GAO download and capture passed, whereas 15 MHz embFlash programming
-failed; the full embFlash and reload sequence passed at 1 MHz. Use 1 MHz for
-production embFlash and as the universal bridge setting until divisor support
-is implemented.
+MPSSE stream and timing assumptions. On the Tang Nano 9K fixture, 15 MHz SRAM
+downloads passed with both WinUSB and FT2CH, and GAO capture passed through
+FT2CH. The `gao_sh` WinUSB capture backend timed out after successful GAO
+bitstream downloads at both 1 MHz and 15 MHz, so that capture issue is not
+caused by the 15 MHz selection. Use FT2CH for GAO capture for now. The 15 MHz
+embFlash operation failed, whereas the full embFlash and reload sequence
+passed at 1 MHz; use 1 MHz for production embFlash and as the universal bridge
+setting until divisor support is implemented.
 
 JTAG function is verified for :
 

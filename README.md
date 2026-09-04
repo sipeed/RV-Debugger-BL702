@@ -196,10 +196,13 @@ MPSSE stream and timing assumptions. On the Tang Nano 9K fixture, 15 MHz SRAM
 downloads passed with both WinUSB and FT2CH, and GAO capture passed through
 FT2CH. The `gao_sh` WinUSB capture backend timed out after successful GAO
 bitstream downloads at both 1 MHz and 15 MHz, so that capture issue is not
-caused by the 15 MHz selection. Use FT2CH for GAO capture for now. The 15 MHz
-embFlash operation failed, whereas the full embFlash and reload sequence
-passed at 1 MHz; use 1 MHz for production embFlash and as the universal bridge
-setting until divisor support is implemented.
+caused by the 15 MHz selection. Use FT2CH for GAO capture for now. A
+discriminating embFlash test changed the intended content from marker B to A:
+the 15 MHz operation reported 100% and then failed, and a subsequent SRAM
+erase/reload produced neither image (`User=0`, `Status=0x15421`, no UART
+marker). The same B image was then programmed and reloaded successfully at
+1 MHz. Use 1 MHz for production embFlash and as the universal bridge setting
+until divisor support is implemented.
 
 JTAG function is verified for :
 

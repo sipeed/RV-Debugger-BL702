@@ -1,6 +1,6 @@
 /**
  * @file io_cfg.h
- * @brief Tang Nano 9K 3674 production-board wiring
+ * @brief BL702 production-board wiring for Tang 4K and Tang Nano 9K
  *
  * Copyright (c) 2021 Sipeed team
  *
@@ -22,6 +22,26 @@
 #ifndef _IO_CFG_H
 #define _IO_CFG_H
 
+/* Both production boards route the FPGA soft UART through BL702 UART1. */
+#define UART_TXD_PIN                 GPIO_PIN_26
+#define UART_RXD_PIN                 GPIO_PIN_27
+#define UART1_HAS_MODEM_CONTROL      0
+#define LED_COUNT                    1
+
+#if defined(bl702_debugger_4k)
+
+/* Tang 4K production board, LED is active low. */
+#define TANG_4K_PRODUCTION           1
+#define LED0_PIN                     GPIO_PIN_17
+
+/* BL702 -> Tang 4K JTAG. */
+#define TDI_PIN                      GPIO_PIN_0
+#define TDO_PIN                      GPIO_PIN_1
+#define TMS_PIN                      GPIO_PIN_2
+#define TCK_PIN                      GPIO_PIN_15
+
+#else
+
 /*
  * Tang_nano_9K_3674_schematics.pdf, sheet BL702:
  *
@@ -34,13 +54,9 @@
  * change boot strapping or the JTAG clock.
  */
 #define TANG_NANO_9K_3674_PRODUCTION 1
-#define UART_TXD_PIN                 GPIO_PIN_26
-#define UART_RXD_PIN                 GPIO_PIN_27
-#define UART1_HAS_MODEM_CONTROL     0
 
 /* D25/LED_STATE, active low; the production board has one BL702 LED. */
 #define LED0_PIN                    GPIO_PIN_24
-#define LED_COUNT                   1
 
 /* BL702 -> GW1NR JTAG nets (R39/R36/R38/R37 on the production sheet). */
 #define TMS_PIN                     GPIO_PIN_14
@@ -54,5 +70,7 @@
  * not one of the JTAG pins.  UART0 RX has no production-board connection.
  */
 #define UART0_TXD_PIN               GPIO_PIN_2
+
+#endif
 
 #endif

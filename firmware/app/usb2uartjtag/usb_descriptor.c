@@ -29,6 +29,9 @@
 #include "bl702_usb.h"
 
 #define USB_MS_OS_20_VENDOR_CODE 0x20
+#define FTDI_BCD_DEVICE 0x0500U
+#define FTDI_BCD_DEVICE_LO (FTDI_BCD_DEVICE & 0xffU)
+#define FTDI_BCD_DEVICE_HI ((FTDI_BCD_DEVICE >> 8) & 0xffU)
 #define USB_SERIAL_PREFIX_LENGTH 11
 #define USB_SERIAL_CHIP_ID_LENGTH 6
 #define USB_SERIAL_DESCRIPTOR_OFFSET (0x12 + 0x37 + 0x04 + 0x0e + 0x1c)
@@ -36,7 +39,7 @@
 
 const uint16_t ftdi_eeprom_info[] = 
 {
-	0x0800, 0x0403, 0x6010, 0x0501, 0x3280, 0x0000, 0x0200, 0x1096,
+	0x0800, 0x0403, 0x6010, FTDI_BCD_DEVICE, 0x3280, 0x0000, 0x0200, 0x1096,
 	0x1aa6, 0x0000, 0x0046, 0x0310, 0x004f, 0x0070, 0x0065, 0x006e,
 	0x002d, 0x0045, 0x0043, 0x031a, 0x0055, 0x0053, 0x0042, 0x0020,
 	0x0044, 0x0065, 0x0062, 0x0075, 0x0067, 0x0067, 0x0065, 0x0072,
@@ -64,14 +67,15 @@ uint8_t cdc_descriptor[] =
     ///////////////////////////////////////
     0x12,                       /* bLength */
     USB_DESCRIPTOR_TYPE_DEVICE, /* bDescriptorType */
-    0x10, 0x02,                 /* bcdUSB: USB 2.1, required for BOS */
+    0x10, 0x02,                 /* bcdUSB: USB 2.1 for BOS; device stays FS */
     0x00,                       /* bDeviceClass */
     0x00,                       /* bDeviceSubClass */
     0x00,                       /* bDeviceProtocol */
     0x40,                       /* bMaxPacketSize */
     0x03, 0x04,                 /* idVendor */
     0x10, 0x60,                 /* idProduct */
-    0x01, 0x05,                 /* bcdDevice: distinct from a real FT2232H */
+    FTDI_BCD_DEVICE_LO,
+    FTDI_BCD_DEVICE_HI,         /* bcdDevice: known full-speed FT2232C/D */
     0x01,                       /* iManufacturer */
     0x02,                       /* iProduct */
     0x03,                       /* iSerial */

@@ -109,28 +109,21 @@ Support JTAG+UART function
 
 ### Windows openFPGALoader
 
-The usb2uartjtag firmware uses USB device revision `0501`. Interface A is the
-JTAG/MPSSE interface and interface B is the UART interface. On Windows,
-openFPGALoader uses libusb, so interface A must use WinUSB. Interface B can
-continue using the FTDI serial driver.
+The usb2uartjtag firmware emulates a full-speed FT2232C/D and therefore uses
+the known USB device revision `0500`. Linux `ftdi_sio` uses this value to select
+its FT2232C/D path; the previous synthetic revision `0501` was rejected as an
+unknown device type.
 
-The driver package matches only this hardware ID:
+Interface A is the JTAG/MPSSE interface and interface B is the UART interface.
+On Windows, the Microsoft OS 2.0 descriptors advertise WinUSB for interface A
+only, while interface B can continue using the FTDI serial driver. The USB
+2.1 value in `bcdUSB` only enables BOS/MS OS descriptor discovery and does not
+claim high-speed signalling; the BL702 controller still enumerates at full
+speed.
 
-~~~
-USB\VID_0403&PID_6010&REV_0501&MI_00
-~~~
-
-It therefore does not match a real FT2232H with revision `0500`. To generate,
-sign, and install the development driver, install the Windows Driver Kit and
-run the following from an elevated PowerShell prompt:
-
-~~~powershell
-Set-ExecutionPolicy -Scope Process Bypass
-.\driver\windows\install-development-driver.ps1
-~~~
-
-The script installs a local development certificate. It checks that connected
-real FTDI `REV_0500` interface-A devices still use `FTDIBUS` after installation.
+The old development INF keyed on `REV_0501` has been removed. Do not replace
+it with a `REV_0500` match: that hardware ID would also match genuine
+FT2232C/D interface-A devices.
 
 Find the BL702 bus/device number and then use interface A with openFPGALoader:
 

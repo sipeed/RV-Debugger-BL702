@@ -1,0 +1,67 @@
+; CMSIS-DAP v2 WinUSB Driver Installation File
+; For DAPLink BL702 firmware: VID=0xC251 PID=0xF00A
+;
+; Usage: Right-click the "DAPLink CMSIS-DAP" device in Device Manager,
+;        select "Update Driver" → "Browse my computer" → point to this file.
+;
+; This sets the DeviceInterfaceGUID to {CDB3B5AD-293B-4663-AA36-1AAE46463776}
+; which is required by Keil MDK to identify CMSIS-DAP v2 debug probes.
+
+[Version]
+Signature = "$Windows NT$"
+Class     = USBDevice
+ClassGUID = {88BAE032-5A81-49f0-BC3D-A4FF138216D6}
+Provider  = %ManufacturerName%
+DriverVer = 04/13/2016, 1.0.0.0
+CatalogFile.NT      = CMSIS_DAP_v2.cat
+CatalogFile.NTarm   = CMSIS_DAP_v2.cat
+CatalogFile.NTarm64 = CMSIS_DAP_v2.cat
+
+; ========== Manufacturer/Models sections ===========
+
+[Manufacturer]
+%ManufacturerName% = Devices, NTarm, NTarm64, NTamd64
+
+[Devices.NTarm]
+%DeviceName% = USB_Install, USB\VID_C251&PID_F00A
+
+[Devices.NTarm64]
+%DeviceName% = USB_Install, USB\VID_C251&PID_F00A
+
+[Devices.NTamd64]
+%DeviceName% = USB_Install, USB\VID_C251&PID_F00A
+
+; ========== Class definition ===========
+
+[ClassInstall32]
+AddReg = ClassInstall_AddReg
+
+[ClassInstall_AddReg]
+HKR,,,,%ClassName%
+HKR,,NoInstallClass,,1
+HKR,,IconPath,0x10000,"%%SystemRoot%%\System32\setupapi.dll,-20"
+HKR,,LowerLogoVersion,,5.2
+
+; =================== Installation ===================
+
+[USB_Install]
+Include = winusb.inf
+Needs   = WINUSB.NT
+
+[USB_Install.Services]
+Include = winusb.inf
+Needs   = WINUSB.NT.Services
+
+[USB_Install.HW]
+AddReg  = Dev_AddReg
+
+[Dev_AddReg]
+; Set CMSIS-DAP v2 Device Interface GUID for Keil MDK / debugger detection
+HKR,,DeviceInterfaceGUIDs,0x10000,"{CDB3B5AD-293B-4663-AA36-1AAE46463776}"
+
+; =================== Strings ===================
+
+[Strings]
+ClassName        = "Universal Serial Bus devices"
+ManufacturerName = "ARM Ltd"
+DeviceName       = "DAPLink CMSIS-DAP v2"

@@ -1,6 +1,7 @@
 /**
  * @file io_cfg.h
- * @brief BL702 production-board wiring for Tang 4K and Tang Nano 9K
+ * @brief BL702 production-board wiring for Tang Nano 4K (rev 3603) and
+ *        Tang Nano 9K (rev 3672 and rev 3674)
  *
  * Copyright (c) 2021 Sipeed team
  *
@@ -28,13 +29,24 @@
 #define UART1_HAS_MODEM_CONTROL      0
 #define LED_COUNT                    1
 
-#if defined(bl702_debugger_4k)
+#if defined(bl702_debugger_tangnano4k) || defined(bl702_debugger_tangnano9k_rev3672)
+/*
+ * Tang Nano 4K (rev 3603) and Tang Nano 9K rev 3672 carry the same BL702
+ * wiring: JTAG on GPIO0/1/2/15, active-low LED_STATE on GPIO17, and
+ * VDDIO3 (GPIO14-GPIO22) supplied at 3V3 rather than the 1V8 used on
+ * rev 3674.  The 4K has no BL702 <-> FPGA UART at all, so the UART1
+ * pins above are simply unconnected there; on 9K rev 3672 they are the
+ * real FPGA_RX/FPGA_TX link.
+ */
+#if defined(bl702_debugger_tangnano4k)
+#define TANG_NANO_4K_PRODUCTION       1
+#else
+#define TANG_NANO_9K_3672_PRODUCTION  1
+#endif
 
-/* Tang 4K production board, LED is active low. */
-#define TANG_4K_PRODUCTION           1
 #define LED0_PIN                     GPIO_PIN_17
 
-/* BL702 -> Tang 4K JTAG. */
+/* BL702 -> FPGA JTAG. */
 #define TDI_PIN                      GPIO_PIN_0
 #define TDO_PIN                      GPIO_PIN_1
 #define TMS_PIN                      GPIO_PIN_2

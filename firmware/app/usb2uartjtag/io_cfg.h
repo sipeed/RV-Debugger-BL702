@@ -52,7 +52,7 @@
 #define TMS_PIN                      GPIO_PIN_2
 #define TCK_PIN                      GPIO_PIN_15
 
-#else
+#elif defined(bl702_debugger)
 
 /*
  * Tang_nano_9K_3674_schematics.pdf, sheet BL702:
@@ -83,6 +83,8 @@
  */
 #define UART0_TXD_PIN               GPIO_PIN_2
 
+#else
+#error "usb2uartjtag: unknown BOARD, add its BL702 pinout to io_cfg.h"
 #endif
 
 #endif

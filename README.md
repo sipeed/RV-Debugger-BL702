@@ -43,6 +43,15 @@ make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag
 
 The firmware is './out/app/usb2uartjtag/usb2uartjtag_bl702.bin'.
 
+`BOARD` selects the BL702 pinout, which differs between the debugger hardware
+revisions:
+
+| `BOARD` | hardware |
+| --- | --- |
+| `bl702_debugger` | Tang Nano 9K rev 3674 |
+| `bl702_debugger_tangnano9k_rev3672` | Tang Nano 9K rev 3672 |
+| `bl702_debugger_tangnano4k` | Tang Nano 4K rev 3603 |
+
 To build usb2dualuart firmware:
 
 ~~~
@@ -228,7 +237,7 @@ firmware/app/usb2uartjtag:
 ├── main.c
 ├── uart_interface.c
 ├── jtag_process.c
-└── io_cfg.h         //main io cfg, another file is pinmux_config.h in bsp/board/bl702_debugger
+└── io_cfg.h         //main io cfg, another file is pinmux_config.h in bsp/board/bl702/bl702_debugger
 components/usb_stack/class/vendor:
 └── usbd_ftdi.c      //all FTDI vendor request process, like baudrate set, dtr/rts set, Latency_Timer
 ~~~

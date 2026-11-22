@@ -38,6 +38,12 @@ jobs:
         git submodule update --init
         cd firmware/bl_mcu_sdk
         PATH="/opt/riscv64-unknown-elf/bin:$PATH"
+        # verify the alternate board pinouts still compile
+        make BOARD=bl702_debugger_tangnano4k APP_DIR=../app APP=usb2uartjtag
+        make clean
+        make BOARD=bl702_debugger_tangnano9k_rev3672 APP_DIR=../app APP=usb2uartjtag
+        make clean
+        # firmware published as artifacts
         make BOARD=bl702_debugger APP_DIR=../app APP=usb2uartjtag
         make BOARD=bl702_debugger_dualuart APP_DIR=../app APP=usb2dualuart
     - name: Archive firmware
